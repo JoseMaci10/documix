@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DocuConvert PRO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+    <style>
+        :root { color-scheme: dark; }
+        body {
+            background: radial-gradient(circle at top, #1e293b, #0f172a);
+            min-height: 100vh;
+            color: white;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .tool-btn {
+            transition: transform .2s ease, background .2s ease, border-color .2s ease;
+            min-height: 120px;
+        }
+        .tool-btn:active { transform: scale(0.98); }
+        .ad-box {
+            min-height: 60px;
+            border: 1px dashed rgba(148, 163, 184, 0.45);
+            background: rgba(15, 23, 42, 0.65);
+        }
+        .premium-box {
+            background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(34,211,238,0.12));
+            border: 1px solid rgba(34,211,238,0.25);
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6">
+    <div class="max-w-6xl mx-auto">
+        <header class="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-10">
+            <div>
+                <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">
+                    DocuConvert PRO
+                </h1>
+                <p class="text-slate-400 text-sm">APK móvil, todas las herramientas visibles</p>
+            </div>
+            <select id="lang" onchange="render()" class="bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm outline-none w-full sm:w-auto">
+                <option value="es">ESPAÑOL</option>
+                <option value="en">ENGLISH</option>
+            </select>
+        </header>
+
+        <div class="ad-box glass rounded-2xl p-4 mb-5 flex items-center justify-center text-slate-300 text-sm">
+            Espacio para anuncio banner
+        </div>
+
+        <div class="premium-box rounded-3xl p-4 sm:p-5 mb-5 glass">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-bold">Premium mensual</h2>
+                    <p class="text-sm text-slate-300">Espacio preparado para suscripción futura</p>
+                </div>
+                <button class="bg-cyan-500 text-slate-950 font-bold px-4 py-2 rounded-xl">Pro</button>
+            </div>
+        </div>
+
+        <div id="panel" class="glass rounded-3xl p-4 sm:p-5 mb-5">
+            <h2 id="panelTitle" class="text-lg font-bold mb-2">Unir PDF</h2>
+            <p id="panelDesc" class="text-sm text-slate-300 mb-4">Selecciona varios archivos PDF para unirlos en un solo documento.</p>
+
+            <div id="controls" class="space-y-3 mb-4"></div>
+
+            <button onclick="runTool()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl active:scale-[0.98]">
+                Ejecutar
+            </button>
+        </div>
+
+        <div id="grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"></div>
+        <div id="status" class="mt-5 text-sm text-slate-300 min-h-[24px]"></div>
+    </div>
+
+    <script>
+        const tools = [
+            { id: 'unir', es: 'Unir PDF', en: 'Merge PDF', icon: '🧩' },
+            { id: 'dividir', es: 'Dividir PDF', en: 'Split PDF', icon: '✂️' },
+            { id: 'comprimir', es: 'Comprimir', en: 'Compress', icon: '🗜️' },
+            { id: 'pdf-word', es: 'PDF a Word', en: 'PDF to Word', icon: '📄' },
+            { id: 'word-pdf', es: 'Word a PDF', en: 'Word to PDF', icon: '📝' },
+            { id: 'proteger', es: 'Proteger', en: 'Protect', icon: '🔒' },
+            { id: 'firmar', es: 'Firmar', en: 'Sign', icon: '✍️' },
+            { id: 'extraer', es: 'Extraer TXT', en: 'Extract TXT', icon: '📤' },
+            { id: 'reparar', es: 'Reparar', en: 'Repair', icon: '🛠️' },
+            { id: 'ocr', es: 'OCR', en: 'OCR', icon: '👁️' },
+            { id: 'rotar', es: 'Rotar', en: 'Rotate', icon: '🔄' },
+            { id: 'marca-agua', es: 'Marca Agua', en: 'Watermark', icon: '💧' }
+        ];
+
+        const info = {
+            unir: { es: 'Une varios PDF en uno.', en: 'Merge multiple PDFs into one.' },
+            dividir: { es: 'Divide un PDF en páginas separadas.', en: 'Split a PDF into separate pages.' },
+            comprimir: { es: 'Reduce el tamaño de un PDF.', en: 'Reduce the size of a PDF.' },
+            'pdf-word': { es: 'Convierte PDF a Word.', en: 'Convert PDF to Word.' },
+            'word-pdf': { es: 'Convierte Word a PDF.', en: 'Convert Word to PDF.' },
+            proteger: { es: 'Protege PDFs con seguridad.', en: 'Protect PDFs with security.' },
+            firmar: { es: 'Firma documentos PDF.', en: 'Sign PDF documents.' },
+            extraer: { es: 'Extrae texto a TXT.', en: 'Extract text to TXT.' },
+            reparar: { es: 'Repara PDFs dañados.', en: 'Repair damaged PDFs.' },
+            ocr: { es: 'Reconoce texto desde imágenes.', en: 'Recognize text from images.' },
+            rotar: { es: 'Rota páginas PDF.', en: 'Rotate PDF pages.' },
+            'marca-agua': { es: 'Agrega marca de agua.', en: 'Add watermark.' }
+        };
+
+        let activeTool = 'unir';
+
+        function render() {
+            const lang = document.getElementById('lang').value;
+            const grid = document.getElementById('grid');
+            const tool = tools.find(t => t.id === activeTool);
+
+            document.getElementById('panelTitle').textContent = tool ? tool[lang] : '';
+            document.getElementById('panelDesc').textContent = info[activeTool]?.[lang] || '';
+
+            document.getElementById('controls').innerHTML = getControls(activeTool, lang);
+
+            grid.innerHTML = tools.map(t => `
+                <button onclick="selectTool('${t.id}')" class="tool-btn glass p-4 sm:p-5 rounded-3xl flex flex-col items-center justify-center gap-3 border ${t.id === activeTool ? 'border-cyan-400 bg-cyan-400/10' : 'border-slate-700'} text-center">
+                    <span class="text-4xl sm:text-5xl">${t.icon}</span>
+                    <span class="text-xs sm:text-sm font-bold uppercase tracking-widest leading-tight">${t[lang]}</span>
+                </button>
+            `).join('');
+        }
+
+        function getControls(id, lang) {
+            const texts = {
+                chooseFiles: lang === 'es' ? 'Seleccionar archivos' : 'Choose files',
+                chooseFile: lang === 'es' ? 'Seleccionar archivo' : 'Choose file',
+                password: lang === 'es' ? 'Contraseña' : 'Password',
+                text: lang === 'es' ? 'Texto' : 'Text',
+                pageNumber: lang === 'es' ? 'Página' : 'Page',
+                quality: lang === 'es' ? 'Calidad' : 'Quality'
+            };
+
+            if (id === 'unir') return `<input id="fileInput" type="file" accept="application/pdf" multiple class="block w-full text-sm">`;
+            if (id === 'dividir') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm"><input id="pageInput" type="number" min="1" value="1" class="block w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm" placeholder="${texts.pageNumber}">`;
+            if (id === 'comprimir') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm"><input id="qualityInput" type="range" min="0.3" max="1" value="0.8" step="0.1" class="w-full">`;
+            if (id === 'proteger') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm"><input id="passwordInput" type="password" class="block w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm" placeholder="${texts.password}">`;
+            if (id === 'firmar') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm"><input id="signInput" type="text" class="block w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm" placeholder="${texts.text}">`;
+            if (id === 'extraer') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm">`;
+            if (id === 'reparar') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm">`;
+            if (id === 'ocr') return `<input id="fileInput" type="file" accept="image/*" class="block w-full text-sm">`;
+            if (id === 'rotar') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm"><input id="pageInput" type="number" min="1" value="1" class="block w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm" placeholder="${texts.pageNumber}">`;
+            if (id === 'marca-agua') return `<input id="fileInput" type="file" accept="application/pdf" class="block w-full text-sm"><input id="watermarkInput" type="text" class="block w-full bg-slate-900 border border-slate-700 p-3 rounded-xl text-sm" placeholder="${texts.text}">`;
+            if (id === 'pdf-word' || id === 'word-pdf') return `<input id="fileInput" type="file" class="block w-full text-sm">`;
+            return '';
+        }
+
+        function selectTool(id) {
+            activeTool = id;
+            document.getElementById('status').textContent = '';
+            render();
+        }
+
+        async function runTool() {
+            const status = document.getElementById('status');
+            const lang = document.getElementById('lang').value;
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput ? fileInput.files : null;
+
+            try {
+                if (activeTool === 'unir') {
+                    if (!files || files.length < 2) return status.textContent = lang === 'es' ? 'Selecciona al menos 2 PDFs.' : 'Select at least 2 PDFs.';
+                    const { PDFDocument } = PDFLib;
+                    const mergedPdf = await PDFDocument.create();
+                    for (const file of files) {
+                        const bytes = await file.arrayBuffer();
+                        const pdf = await PDFDocument.load(bytes);
+                        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                        copiedPages.forEach(page => mergedPdf.addPage(page));
+                    }
+                    return downloadFile(await mergedPdf.save(), 'merged.pdf', 'application/pdf', status, lang === 'es' ? 'PDF unido correctamente.' : 'PDF merged successfully.');
+                }
+
+                if (activeTool === 'dividir') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    const { PDFDocument } = PDFLib;
+                    const bytes = await files[0].arrayBuffer();
+                    const pdf = await PDFDocument.load(bytes);
+                    const out = await PDFDocument.create();
+                    const pageIndex = Math.max(0, (parseInt(document.getElementById('pageInput')?.value || '1', 10) - 1));
+                    const page = await out.copyPages(pdf, [Math.min(pageIndex, pdf.getPageCount() - 1)]);
+                    out.addPage(page[0]);
+                    return downloadFile(await out.save(), 'split.pdf', 'application/pdf', status, lang === 'es' ? 'PDF dividido correctamente.' : 'PDF split successfully.');
+                }
+
+                if (activeTool === 'proteger') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    const password = document.getElementById('passwordInput')?.value || '';
+                    if (!password) return status.textContent = lang === 'es' ? 'Escribe una contraseña.' : 'Enter a password.';
+                    return status.textContent = lang === 'es' ? 'Protección lista para conectar con cifrado real.' : 'Protection ready to connect with real encryption.';
+                }
+
+                if (activeTool === 'firmar') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    const sign = document.getElementById('signInput')?.value || '';
+                    if (!sign) return status.textContent = lang === 'es' ? 'Escribe el texto de firma.' : 'Enter signature text.';
+                    return status.textContent = lang === 'es' ? 'Firma visual lista para conectar.' : 'Visual signature ready to connect.';
+                }
+
+                if (activeTool === 'extraer') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    return status.textContent = lang === 'es' ? 'Extracción de texto lista para conectar.' : 'Text extraction ready to connect.';
+                }
+
+                if (activeTool === 'reparar') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    return status.textContent = lang === 'es' ? 'Reparación lista para conectar.' : 'Repair ready to connect.';
+                }
+
+                if (activeTool === 'ocr') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona una imagen.' : 'Select an image.';
+                    return status.textContent = lang === 'es' ? 'OCR listo para conectar.' : 'OCR ready to connect.';
+                }
+
+                if (activeTool === 'rotar') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    return status.textContent = lang === 'es' ? 'Rotación lista para conectar.' : 'Rotation ready to connect.';
+                }
+
+                if (activeTool === 'marca-agua') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    const text = document.getElementById('watermarkInput')?.value || '';
+                    if (!text) return status.textContent = lang === 'es' ? 'Escribe la marca de agua.' : 'Enter watermark text.';
+                    return status.textContent = lang === 'es' ? 'Marca de agua lista para conectar.' : 'Watermark ready to connect.';
+                }
+
+                if (activeTool === 'pdf-word' || activeTool === 'word-pdf') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un archivo.' : 'Select a file.';
+                    return status.textContent = lang === 'es' ? 'Conversión lista para conectar.' : 'Conversion ready to connect.';
+                }
+
+                if (activeTool === 'comprimir') {
+                    if (!files || !files[0]) return status.textContent = lang === 'es' ? 'Selecciona un PDF.' : 'Select a PDF.';
+                    return status.textContent = lang === 'es' ? 'Compresión lista para conectar.' : 'Compression ready to connect.';
+                }
+
+                status.textContent = lang === 'es' ? 'Acción no disponible.' : 'Action not available.';
+            } catch (error) {
+                console.error(error);
+                status.textContent = lang === 'es' ? 'Error al procesar el archivo.' : 'Error processing the file.';
+            }
+        }
+
+        function downloadFile(bytes, filename, mime, status, okText) {
+            const blob = new Blob([bytes], { type: mime });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            status.textContent = okText;
+        }
+
+        render();
+    </script>
+</body>
+</html>
